@@ -38,13 +38,8 @@ class Neck(QGraphicsPathItem):
     nutWidth = 2.0
     # approximate    
     nutThickness = 0.125
-    def __init__(self, tuning=['E', 
-                               'A',
-                               'D',
-                               'G',
-                               'B',
-                               'E'],
-                 nFrets=22, parent=None):
+    def __init__(self, tuning=['E', 'A', 'D', 'G', 'B', 'E'], nFrets=22,
+                 parent=None):
         """Initialize a neck with 22 frets in standard tuning.
 
         tuning -- A list of open string notes. The default is:
@@ -110,11 +105,14 @@ class Neck(QGraphicsPathItem):
             fretX1 = self.fretXs[n-1]
             fretX2 = self.fretXs[n]
             x = fretX1 + (fretX2 - fretX1) / 2.0
+            d = self.markerDia
+            r = d / 2.0
+            dy = self.nutWidth / 4.0
             if n % 12 == 0:
-                pp.addEllipse(x-.125, y-.125-.4375, .25, .25)
-                pp.addEllipse(x-.125, y-.125+.4375, .25, .25)
+                pp.addEllipse(x-r, y-r-dy, d, d)
+                pp.addEllipse(x-r, y-r+dy, d, d)
             else:
-                pp.addEllipse(x-.125, y-.125, .25, .25)
+                pp.addEllipse(x-r, y-r, d, d)
         # strings
         self.stringYs = []
         offset = self.nutWidth * .03
@@ -164,6 +162,7 @@ class Neck(QGraphicsPathItem):
         Return None.
         """
         super(Neck, self).paint(painter, option, widget)
+        # round, solid black note markers
         painter.setBrush(QBrush(QColor(0, 0, 0)))
         painter.setPen(QColor(0, 0, 0))
         for string, fret in self.markedNotes:
