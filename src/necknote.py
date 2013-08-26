@@ -15,8 +15,20 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtCore import Qt as qt
 
-from neck import NOTES, LOOKUP, Neck
+from neck import NOTES, SHARP2FLAT, Neck
 
+# ASCII to Unicode for notes -> GUI labels.
+# This simply keeps all the Unicode characters in one place.
+ASC2UNI = {'A#': u'A♯', 'A': 'A', 'Ab': u'A♭',
+                        'B': 'B', 'Bb': u'B♭',
+           'C#': u'C♯', 'C': 'C',
+           'D#': u'D♯', 'D': 'D', 'Db': u'D♭',
+                        'E': 'E', 'Eb': u'E♭',
+           'F#': u'F♯', 'F': 'F',
+           'G#': u'G♯', 'G': 'G', 'Gb': u'G♭'}
+
+# Unicode to ASCII for GUI lables -> notes.
+UNI2ASC = dict([[v,k] for k,v in ASC2UNI.items()])
 
 class Scene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -30,7 +42,14 @@ class View(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setScene(scene)
-        self.neck = Neck()
+        # 4 string
+        # self.neck = Neck(nStrings=4, tuning="E A D G".split())
+        # 5 string
+        # self.neck = Neck(nStrings=5, tuning="B E A D G".split())
+        # 6 string
+        self.neck = Neck(nStrings=6, tuning="E A D G B E".split())
+        # 7 string
+        # self.neck = Neck(nStrings=7, tuning="B E A D G B E".split())
         self.scene().addItem(self.neck)
     def sizeHint(self):
         return QSize(1600, 200)
@@ -64,13 +83,12 @@ class AppWindow(QMainWindow):
         Next Note Frets 22 Lefty x
         """
         self.gLayout.setSpacing(0)
-        for col, label in enumerate([u'A♯', '', u'C♯', u'D♯', '', u'F♯',
-                                     u'G♯']):
-            but = QPushButton(label)
-            if label == '':
+        for col, label in enumerate([ASC2UNI.get(x, None) for x in
+                                     "A# _ C# D# _ F# G#".split()]):
+            if label is None:
                 continue
+            but = QPushButton(label)
             self.gLayout.addWidget(but, 0, col)
-            # self.gLayout.setColumnStretch(col, 1)
             self.connect(but, SIGNAL('pressed()'),
                          lambda note=label : self.onPress(note))
         for col, label in enumerate('A B C D E F G'.split()):
@@ -78,11 +96,11 @@ class AppWindow(QMainWindow):
             self.gLayout.addWidget(but, 1, col)
             self.connect(but, SIGNAL('pressed()'),
                          lambda note=label : self.onPress(note))
-        for col, label in enumerate([u'A♭', u'B♭', '', u'D♭', u'E♭', '',
-                                     u'G♭']):
-            but = QPushButton(label)
-            if label == '':
+        for col, label in enumerate([ASC2UNI.get(x, None) for x in
+                                     "Ab Bb _ Db Eb _ Gb".split()]):
+            if label is None:
                 continue
+            but = QPushButton(label)
             self.gLayout.addWidget(but, 2, col)
             self.connect(but, SIGNAL('pressed()'),
                          lambda note=label : self.onPress(note))
@@ -112,7 +130,7 @@ class AppWindow(QMainWindow):
     def onPress(self, note):
         """Check if the user guessed the right note.
 
-        note -- string lable of the button pressed
+        note -- string label of the button pressed (Unicode)
 
         If note matches the current note displayed on the neck, call
         nextNote(), else show all the positions of the current note on the
@@ -120,7 +138,8 @@ class AppWindow(QMainWindow):
 
         Called when a Note button is pressed.
         """
-        if LOOKUP.get(note, note) == self.curNote:
+        asciiNote = UNI2ASC[note]
+        if SHARP2FLAT.get(asciiNote, asciiNote) == self.curNote:
             self.nextNote()
         else:
             self.view.neck.markAll(self.curNote)
