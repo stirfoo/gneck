@@ -17,11 +17,11 @@ from PyQt4.QtCore import Qt as qt
 from util import ASC2UNI
 
 
-class NoteGuessWidget(QWidget):
+class NoteGuessWidget(QGroupBox):
     """Note-labeled button array + Update button.
     """
     def __init__(self, parent=None):
-        super(NoteGuessWidget, self).__init__(parent)
+        super(NoteGuessWidget, self).__init__('Note Drill', parent)
         vLayout = QVBoxLayout(self)
         gLayout = QGridLayout()
         gLayout.setSpacing(0)
@@ -31,36 +31,21 @@ class NoteGuessWidget(QWidget):
                 continue
             but = QPushButton(label)
             gLayout.addWidget(but, 0, col)
-            # self.connect(but, SIGNAL('pressed()'),
-            #              lambda note=UNI2ASC.get(label, label)
-            #              : parent.onGuessNote(note))
         for col, label in enumerate('A B C D E F G'.split()):
             but = QPushButton(label)
             gLayout.addWidget(but, 1, col)
-            # self.connect(but, SIGNAL('pressed()'),
-            #              lambda note=UNI2ASC.get(label, label)
-            #              : parent.onGuessNote(note))
         for col, label in enumerate([ASC2UNI.get(x, None) for x in
                                      "Ab Bb _ Db Eb _ Gb".split()]):
             if label is None:
                 continue
             but = QPushButton(label)
             gLayout.addWidget(but, 2, col)
-            # self.connect(but, SIGNAL('pressed()'),
-            #              lambda note=UNI2ASC.get(label, label)
-            #              : parent.onGuessNote(note))
         vLayout.addLayout(gLayout)
         but = QPushButton("Next Note")
-        # self.connect(but, SIGNAL('pressed()'), parent.nextNote)
-        vLayout.addWidget(but)
-        
+        vLayout.addWidget(but, 0, qt.AlignHCenter)
+        vLayout.addStretch(2)
+        self.setLayout(vLayout)
 
-class DummyWidget(QWidget):
-    def onGuessNote(self, x):
-        print x
-    def nextNote(self):
-        pass
-    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     d = DummyWidget()

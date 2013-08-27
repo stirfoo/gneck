@@ -15,11 +15,11 @@ from PyQt4.QtCore import Qt as qt
 from util import TUNINGS
 
 
-class NeckConfigWidget(QWidget):
+class NeckConfigWidget(QGroupBox):
     """GUI to set the neck tuning, number of frets and handedness.
     """
     def __init__(self, tuning='EADGBE', nFrets=22, lefty=False, parent=None):
-        super(NeckConfigWidget, self).__init__(parent)
+        super(NeckConfigWidget, self).__init__('Neck Config', parent)
         tuningLabel = QLabel('Tuning')
         self.tuningCombo = QComboBox()
         activeIdx = 0
@@ -37,12 +37,16 @@ class NeckConfigWidget(QWidget):
         self.fretsSpinBox.setMaximum(24)
         self.leftyCheckBox = QCheckBox('Lefty?')
         self.leftyCheckBox.setChecked(lefty)
-        layout = QGridLayout(self)
-        layout.addWidget(tuningLabel, 1, 0, qt.AlignRight)
-        layout.addWidget(self.tuningCombo, 1, 1)
-        layout.addWidget(fretsLabel, 2, 0, qt.AlignRight)
-        layout.addWidget(self.fretsSpinBox, 2, 1)
-        layout.addWidget(self.leftyCheckBox, 3, 1)
+        gLayout = QGridLayout()
+        gLayout.addWidget(tuningLabel, 1, 0, qt.AlignRight)
+        gLayout.addWidget(self.tuningCombo, 1, 1)
+        gLayout.addWidget(fretsLabel, 2, 0, qt.AlignRight)
+        gLayout.addWidget(self.fretsSpinBox, 2, 1)
+        gLayout.addWidget(self.leftyCheckBox, 3, 1)
+        vLayout = QVBoxLayout()
+        vLayout.addLayout(gLayout)
+        vLayout.addStretch(2)
+        self.setLayout(vLayout)
 
 
 if __name__ == '__main__':

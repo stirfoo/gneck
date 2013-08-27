@@ -15,11 +15,11 @@ from PyQt4.QtCore import Qt as qt
 from util import INTERVALS, ASC2UNI, UNI2ASC
 
 
-class ScaleWidget(QWidget):
+class ScaleWidget(QGroupBox):
     """Select key and scale widget
     """
     def __init__(self, parent=None):
-        super(ScaleWidget, self).__init__(parent)
+        super(ScaleWidget, self).__init__('Scales', parent)
         keyLabel = QLabel('Key')
         self.keyComboBox = QComboBox()
         for noteName in [ASC2UNI[x] for x in
@@ -29,13 +29,15 @@ class ScaleWidget(QWidget):
         self.scaleListView = QListWidget()
         for scale in sorted(INTERVALS.keys()):
             self.scaleListView.addItem(scale)
+        self.scaleListView.setCurrentRow(0)
         vLayout = QVBoxLayout(self)
         hLayout = QHBoxLayout()
-        hLayout.addStretch(1)
         hLayout.addWidget(keyLabel)
         hLayout.addWidget(self.keyComboBox)
+        hLayout.addStretch(1)
         vLayout.addLayout(hLayout)
         vLayout.addWidget(self.scaleListView)
+        self.setLayout(vLayout)
     def curScale(self):
         return str(self.scaleListView.currentItem().text())
     def curKey(self):

@@ -60,6 +60,7 @@ class AppWindow(QMainWindow):
         self.gLayout.setRowStretch(0, 1)
         self.gLayout.addWidget(self._createNeckCfgWidget(), 1, 0)
         self.gLayout.addWidget(self._createScaleWidget(), 1, 1)
+        self.gLayout.setColumnStretch(1, 2)
         self.gLayout.addWidget(self._createNoteGuessWidget(), 1, 2)
         self.setCentralWidget(self.widget)
     def _createNeckCfgWidget(self):
