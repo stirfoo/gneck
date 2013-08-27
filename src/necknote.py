@@ -3,11 +3,13 @@
 
 """necknote.py
 
-Drill the user (me!) on note names at a given neck position.
+Drill the user (me!) on note names at a given neck position or display
+selected scales.
 
 Saturday, August 24 2013
 """
 
+import re
 import sys
 from random import choice
 
@@ -15,20 +17,11 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtCore import Qt as qt
 
-from neck import NOTES, SHARP2FLAT, Neck
-
-# ASCII to Unicode for notes -> GUI labels.
-# This simply keeps all the Unicode characters in one place.
-ASC2UNI = {'A#': u'A♯', 'A': 'A', 'Ab': u'A♭',
-                        'B': 'B', 'Bb': u'B♭',
-           'C#': u'C♯', 'C': 'C',
-           'D#': u'D♯', 'D': 'D', 'Db': u'D♭',
-                        'E': 'E', 'Eb': u'E♭',
-           'F#': u'F♯', 'F': 'F',
-           'G#': u'G♯', 'G': 'G', 'Gb': u'G♭'}
-
-# Unicode to ASCII for GUI lables -> notes.
-UNI2ASC = dict([[v,k] for k,v in ASC2UNI.items()])
+from util import UNI2ASC, INTERVALS, NOTES, SHARP2FLAT
+from neck import Neck
+from noteguess import NoteGuessWidget
+from neckcfg import NeckConfigWidget
+from scales import ScaleWidget
 
 class Scene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -42,22 +35,17 @@ class View(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setScene(scene)
-        # 4 string
-        # self.neck = Neck(nStrings=4, tuning="E A D G".split())
-        # 5 string
-        # self.neck = Neck(nStrings=5, tuning="B E A D G".split())
-        # 6 string
-        self.neck = Neck(nStrings=6, tuning="E A D G B E".split())
-        # 7 string
-        # self.neck = Neck(nStrings=7, tuning="B E A D G B E".split())
+        self.neck = Neck()
         self.scene().addItem(self.neck)
+    def fitNeck(self):
+        self.fitInView(self.neck, qt.KeepAspectRatio)
     def sizeHint(self):
         return QSize(1600, 200)
     def resizeEvent(self, e):
         """Fit the neck into the view.
         """
         super(View, self).resizeEvent(e)
-        self.fitInView(self.neck, qt.KeepAspectRatio)
+        self.fitNeck()
         
 
 class AppWindow(QMainWindow):
@@ -66,68 +54,72 @@ class AppWindow(QMainWindow):
         self.setWindowTitle("GNeck")
         self.widget = QWidget(self)
         self.scene = Scene(self)
-        self.view = View(self.scene, self.widget)
-        self.vLayout = QVBoxLayout(self.widget)
-        self.gLayout = QGridLayout()
-        self.vLayout.addWidget(self.view)
-        self.vLayout.addLayout(self.gLayout)
-        self.makeButtons()
+        self.view = View(self.scene)
+        self.gLayout = QGridLayout(self.widget)
+        self.gLayout.addWidget(self.view, 0, 0, 1, 3)
+        self.gLayout.setRowStretch(0, 1)
+        self.gLayout.addWidget(self._createNeckCfgWidget(), 1, 0)
+        self.gLayout.addWidget(self._createScaleWidget(), 1, 1)
+        self.gLayout.addWidget(self._createNoteGuessWidget(), 1, 2)
         self.setCentralWidget(self.widget)
-        self.nextNote()
-    def makeButtons(self):
-        """Create and connect all the buttons.
-        
-        A#      C#  D#      F#  G#
-        A   B   C   D   E   F   G
-        Ab  Bb      Db  Eb      Gb
-        Next Note Frets 22 Lefty x
+    def _createNeckCfgWidget(self):
+        w = NeckConfigWidget()
+        self.connect(w.tuningCombo, SIGNAL('activated(const QString&)'),
+                     self.onTuningChanged)
+        self.connect(w.fretsSpinBox, SIGNAL("valueChanged(int)"),
+                     self.onFretCountChanged)
+        self.connect(w.leftyCheckBox, SIGNAL("toggled(bool)"),
+                     self.onLeftyChanged)
+        return w
+    def _createScaleWidget(self):
+        w = ScaleWidget()
+        self.scaleWidget = w    # for Scale/Key change
+        self.connect(w.keyComboBox, SIGNAL('activated(const QString&)'),
+                     lambda keyName
+                     : self.onScaleKeyChanged(UNI2ASC[unicode(keyName)]))
+        self.connect(w.scaleListView,
+                     SIGNAL('currentTextChanged(const QString&)'),
+                     self.onScaleChanged)
+        return w
+    def _createNoteGuessWidget(self):
+        w = NoteGuessWidget()
+        for button in [x for x in w.children() if isinstance(x, QPushButton)]:
+            txt = button.text()
+            if txt == 'Next Note':
+                self.connect(button, SIGNAL('pressed()'), self.onNextNote)
+            else:
+                self.connect(button, SIGNAL('pressed()'),
+                             lambda noteName=UNI2ASC[unicode(txt)]
+                             : self.onNoteGuessPress(noteName))
+        return w
+    def onTuningChanged(self, tuning):
+        t = [SHARP2FLAT.get(x, x)
+             for x in re.findall(r'[A-G][#b]?', str(tuning))]
+        self.view.neck.setTuning(t)
+        self.view.neck.updateAll()
+        self.view.fitNeck()
+    def onLeftyChanged(self, bValue):
+        """Change the orientation of the neck.
+
+        value -- True to show a left-handed neck, False otherwise
+
+        Called when Lefty check box is clicked.
         """
-        self.gLayout.setSpacing(0)
-        for col, label in enumerate([ASC2UNI.get(x, None) for x in
-                                     "A# _ C# D# _ F# G#".split()]):
-            if label is None:
-                continue
-            but = QPushButton(label)
-            self.gLayout.addWidget(but, 0, col)
-            self.connect(but, SIGNAL('pressed()'),
-                         lambda note=label : self.onPress(note))
-        for col, label in enumerate('A B C D E F G'.split()):
-            but = QPushButton(label)
-            self.gLayout.addWidget(but, 1, col)
-            self.connect(but, SIGNAL('pressed()'),
-                         lambda note=label : self.onPress(note))
-        for col, label in enumerate([ASC2UNI.get(x, None) for x in
-                                     "Ab Bb _ Db Eb _ Gb".split()]):
-            if label is None:
-                continue
-            but = QPushButton(label)
-            self.gLayout.addWidget(but, 2, col)
-            self.connect(but, SIGNAL('pressed()'),
-                         lambda note=label : self.onPress(note))
-        hLayout = QHBoxLayout()
-        self.vLayout.addLayout(hLayout)
-        but = QPushButton("Next Note")
-        spinBox = QSpinBox()
-        spinBox.setValue(self.view.neck.nFrets)
-        spinBox.setMinimum(2)
-        spinBox.setMaximum(24)
-        self.connect(spinBox, SIGNAL("valueChanged(int)"), self.onSpin)
-        leftyCheckBox = QCheckBox()
-        self.connect(leftyCheckBox, SIGNAL("toggled(bool)"), self.onLefty)
-        hLayout.addStretch(1)
-        hLayout.addWidget(but)
-        hLayout.addWidget(QLabel("Frets"))
-        hLayout.addWidget(spinBox)
-        hLayout.addWidget(QLabel("Lefty"))
-        hLayout.addWidget(leftyCheckBox)
-        self.connect(but, SIGNAL('pressed()'), self.nextNote)
-    def nextNote(self):
+        self.view.neck.setLeftHanded(bValue)
+        self.view.fitNeck()
+    def onScaleKeyChanged(self, keyName):
+        self.view.neck.markScale(self.scaleWidget.curScale(), str(keyName))
+        self.scene.update()
+    def onScaleChanged(self, scaleName):
+        self.view.neck.markScale(str(scaleName), self.scaleWidget.curKey())
+        self.scene.update()
+    def onNextNote(self):
         """Display the next random note on the fretboard
         """
         self.curNote = choice(NOTES)
         self.view.neck.markRandomNote(self.curNote)
         self.scene.update()
-    def onPress(self, note):
+    def onNoteGuessPress(self, noteName):
         """Check if the user guessed the right note.
 
         note -- string label of the button pressed (Unicode)
@@ -138,30 +130,21 @@ class AppWindow(QMainWindow):
 
         Called when a Note button is pressed.
         """
-        asciiNote = UNI2ASC[note]
-        if SHARP2FLAT.get(asciiNote, asciiNote) == self.curNote:
-            self.nextNote()
+        if SHARP2FLAT.get(noteName, noteName) == self.curNote:
+            self.onNextNote()
         else:
             self.view.neck.markAll(self.curNote)
             self.scene.update()
-    def onSpin(self, value):
+    def onFretCountChanged(self, frets):
         """Update the number of frets on the neck.
 
         value -- integer
 
         Called when the Fret spin box is changed.
         """
-        self.view.neck.setFretCount(value)
-        self.view.fitInView(self.view.neck, qt.KeepAspectRatio)
-    def onLefty(self, value):
-        """Change the orientation of the neck.
-
-        value -- True to show a left-handed neck, False otherwise
-
-        Called when Lefty check box is clicked.
-        """
-        self.view.neck.setLeftHanded(value)
-        self.view.fitInView(self.view.neck, qt.KeepAspectRatio)
+        self.view.neck.setFretCount(frets)
+        self.view.neck.updateAll()
+        self.view.fitNeck()
         
             
 class App(QApplication):

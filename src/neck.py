@@ -6,34 +6,30 @@
 Sunday, August 25 2013
 """
 
+from math import sin, asin, degrees
 from random import randrange
 from itertools import cycle
 
-from PyQt4.QtCore import QPointF
+from PyQt4.QtCore import QPointF, QRectF
 from PyQt4.QtGui import (QGraphicsPathItem, QBrush, QPen, QTransform, QColor,
                          QPainterPath)
 from PyQt4.QtCore import Qt as qt
 
-
-# all note names, only flats are used internally
-NOTES = ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab']
-# sharp to flat look-up
-SHARP2FLAT = {'A#': 'Bb', 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab'}
+from util import NOTES, SHARP2FLAT, INTERVALS, listRot
 
 
 class Neck(QGraphicsPathItem):
     """A graphical representation of a six string guitar neck.
 
     The neck may have 2 to 24 frets, be left or right-handed, and the tuning
-    may be configured.
+    may be configured. The number of strings will be derived from the tuning.
     """
     # NOTE: all these are fudged for aesthetics
     markerDia = 0.25
-    nutThickness = 0.125
+    nutThickness = 0.1875
     stringSpacing = .375
     stringEdgeOffset = .06      # y distance from edge of neck to string
-    def __init__(self, tuning="E A D G B E".split(), nFrets=22,
-                 nStrings=6, parent=None):
+    def __init__(self, tuning="E A D G B E".split(), nFrets=22, parent=None):
         """Initialize a neck.
 
         tuning -- A list of open string notes. Index 0 is the heaviest
@@ -41,26 +37,34 @@ class Neck(QGraphicsPathItem):
                   Use b for flat and # for sharp, e.g. A#, Bb.
                   B#, Cb, E#, and Fb are illegal.
         nFrets -- integer, number of frets between 2 and 24, default is 22
-        nStrings -- integer, number of strings between 4 and 7, default is 6
         parent -- QGraphicsItem or None, default is None
         """
         super(Neck, self).__init__(parent)
         # a little thicker lines
         self.setPen(QPen(QColor(0, 0, 0), .025))
-        if nStrings < 4 or nStrings > 7:
-            raise Excpetion("number of strings must 4 to 7")
-        self.nString = nStrings
-        if len(tuning) != nStrings:
-            raise Exception("tuning does not match number of strings")
+        self.markedNotes = []
+        self.setTuning(tuning)
+        self.setFretCount(nFrets)
+        self.updateAll()
+    def setTuning(self, tuning):
+        """Configure the string tuning.
+
+        tuning -- list of notes names as strings, from heaviest to lightest
+                  string. 
+
+        Does not call update(). Return None.
+        """
+        result = []
+        self.nStrings = len(tuning)
+        if self.nStrings < 2 or self.nStrings > 7:
+            raise Exception("tuning must have 4 to 7 notes")
         for noteName in tuning:
             try:
-                self.checkNoteName(noteName)
+                result.append(self.checkNoteName(noteName))
             except:
                 raise Exception("Illegal note name"
                                 " in tuning: {}".format(repr(noteName)))
-        self.tuning = tuning
-        self.nStrings = nStrings
-        self.setFretCount(nFrets)
+        self.tuning = result
     def setFretCount(self, n):
         """Set the number of frets on the neck
 
@@ -72,9 +76,11 @@ class Neck(QGraphicsPathItem):
             raise Exception("number of frets must be an integer from"
                             " 2 to 24, not {}".format(repr(n)))
         self.nFrets = n
+    def updateAll(self):
         self.markedNotes = []
         self._createNotes()
         self._updatePP()
+        self.update()
     def setLeftHanded(self, bValue):
         """Configure the neck as left or right-handed.
 
@@ -123,16 +129,32 @@ class Neck(QGraphicsPathItem):
                 pp.addEllipse(x-r, y-r, d, d)
         # strings
         self.stringYs = []
-        x = self.fretXs[-1]
+        endX = self.fretXs[-1]
         for n in range(self.nStrings):
             y = self.stringEdgeOffset + self.stringSpacing * n
             self.stringYs.append(y)
-            pp.moveTo(-self.nutThickness, y)
-            pp.lineTo(x, y)
+            pp.moveTo(-self.nutThickness - self.fretXs[1] / 2.0, y)
+            pp.lineTo(endX, y)
         # outline
         pp.addRect(0, 0, self.fretXs[-1], nutWidth)
         # nut
         pp.addRect(-self.nutThickness, 0, self.nutThickness, nutWidth)
+        # partial headstock, to allow room for open note display
+        # upper curve
+        r = 2.0
+        d = self.fretXs[1] / 2.0
+        rectL = -self.nutThickness - r
+        rect = QRectF(rectL, -r*2.0, r*2.0, r*2.0)
+        ra = asin(d / r)
+        da = degrees(ra)
+        pp.arcMoveTo(rect, 270.0)
+        pp.arcTo(rect, 270.0, -da)
+        # lower curve
+        rect = QRectF(rectL, nutWidth, r*2.0, r*2.0)
+        pp.arcMoveTo(rect, 90.0)
+        pp.arcTo(rect, 90.0, da)
+        # x coordinate of open string note markers
+        self.openX = (-self.nutThickness - sin(ra) * r) / 2.0
         self.setPath(pp)
     def _createNotes(self):
         """Create a MxN array of all note names on the neck.
@@ -165,16 +187,21 @@ class Neck(QGraphicsPathItem):
         Return None.
         """
         super(Neck, self).paint(painter, option, widget)
-        # round, solid black note markers
-        painter.setBrush(QBrush(QColor(0, 0, 0)))
-        painter.setPen(QColor(0, 0, 0))
-        for string, fret in self.markedNotes:
-            yc = self.stringYs[string]
-            fretX1 = self.fretXs[fret-1]
-            fretX2 = self.fretXs[fret]
-            xc = (fretX1 + fretX2) / 2.0
+        for string, fret, root in self.markedNotes:
+            if root:
+                # mark root notes different color
+                painter.setBrush(QBrush(QColor(255, 0, 0)))
+                painter.setPen(QColor(255, 0, 0))
+            else:
+                painter.setBrush(QBrush(QColor(0, 0, 0)))
+                painter.setPen(QColor(0, 0, 0))
+            if fret == 0:
+                # special case for open notes
+                x = self.openX
+            else:
+                x = (self.fretXs[fret-1] + self.fretXs[fret]) / 2.0
             r = self.markerDia / 2.0
-            painter.drawEllipse(QPointF(xc, yc), r, r)
+            painter.drawEllipse(QPointF(x, self.stringYs[string]), r, r)
     def markRandomNote(self, noteName):
         """Mark the note for display on the neck.
 
@@ -185,15 +212,20 @@ class Neck(QGraphicsPathItem):
         noteName = self.checkNoteName(noteName)
         while True:
             string = randrange(self.nStrings)
-            startFret = randrange(1, self.nFrets)
+            # try to get a little more even distibution of the note palcement
+            if randrange(10) % 2 == 0:
+                startFret = 0
+            else:
+                startFret = randrange(self.nFrets)
             try:
+                # find the first noteName on string, starting at startFret
                 idx = self.allNotes[string][startFret:].index(noteName)
             except ValueError:
                 continue
-            self.markedNotes = [(string, idx + startFret)]
+            self.markedNotes = [(string, idx + startFret, False)]
             break
     def markAll(self, noteName):
-        """Mark every position (except open strings) of noteName for display.
+        """Mark every position of noteName for display.
 
         noteName -- see: checkNoteName()
         
@@ -202,9 +234,41 @@ class Neck(QGraphicsPathItem):
         noteName = self.checkNoteName(noteName)
         self.markedNotes = []
         for string, stringNotes in enumerate(self.allNotes):
-            for fret, note in enumerate(stringNotes[1:]):
+            for fret, note in enumerate(stringNotes):
                 if note == noteName:
-                    self.markedNotes.append((string, fret + 1))
+                    self.markedNotes.append((string, fret, False))
+    def markScale(self, scaleName, keyName):
+        """Mark the scale in the given key.
+
+        scaleName -- a key found in ScaleNeck.intervals
+        keyName -- see: checkNoteName()
+
+        Does not call update(). Raise Exception if either scaleName or keyName
+        is unknown. Return None.
+        """
+        try:
+            keyName = self.checkNoteName(keyName)
+        except:
+            raise Exception('Unknown key name: {}'.format(repr(keyName)))
+        intervals = INTERVALS.get(scaleName, None)
+        if intervals is None:
+            raise Exception('Unknown scale name: {}'.format(repr(scaleName)))
+        self.markedNotes = []
+        idx = NOTES.index(keyName)
+        shiftedNotes = listRot(NOTES, -idx)
+        notes = [shiftedNotes[0]]
+        i = 0
+        for ii in intervals[:-1]:
+            i = i + ii
+            notes.append(shiftedNotes[i])
+        self.markedNotes = []
+        for name in notes:
+            noteName = self.checkNoteName(name)
+            for string, stringNotes in enumerate(self.allNotes):
+                for fret, note in enumerate(stringNotes):
+                    if note == noteName:
+                        self.markedNotes.append((string, fret,
+                                                 note == keyName))
     def checkNoteName(self, noteName):
         """Ensure noteName is valid.
 
@@ -218,4 +282,78 @@ class Neck(QGraphicsPathItem):
             if noteName is None:
                 raise Exception("Illegal note {}".format(repr(noteName)))
         return noteName
-        
+    
+# class ScaleNeck(Neck):
+#     # 1 is 1 fret, 2 is 2, etc.
+#     majIntervals = [2, 2, 1, 2, 2, 2, 1]
+#     majPentIntervals = [2, 2, 3, 2, 3]
+#     majBluesIntervals = [2, 1, 1, 3, 2, 3]
+#     intervals = {'Major': listRot(majIntervals, 0),
+#                  'Ionian': listRot(majIntervals, 0),
+#                  'Dorian': listRot(majIntervals, -1),
+#                  'Phrygian': listRot(majIntervals, -2),
+#                  'Lydian': listRot(majIntervals, -3),
+#                  'Mixolydian': listRot(majIntervals, -4),
+#                  'Aeolian': listRot(majIntervals, -5),
+#                  'Locrian': listRot(majIntervals, -6),
+#                  'Major Pentatonic': listRot(majPentIntervals, 0),
+#                  'Minor Pentatonic': listRot(majPentIntervals, 1),
+#                  'Harmonic Minor': [2, 1, 2, 2, 1, 3, 1],
+#                  'Major Blues': listRot(majBluesIntervals, 0),
+#                  'Minor Blues': listRot(majBluesIntervals, 1),
+#                  }
+#     def markScale(self, scaleName, keyName):
+#         """Mark the scale in the given key.
+
+#         scaleName -- a key found in ScaleNeck.intervals
+#         keyName -- see: checkNoteName()
+
+#         Does not call update(). Raise Exception if either scaleName or keyName
+#         is unknown. Return None.
+#         """
+#         try:
+#             keyName = self.checkNoteName(keyName)
+#         except:
+#             raise Exception('Unknown key name: {}'.format(repr(keyName)))
+#         intervals = self.intervals.get(scaleName, None)
+#         if intervals is None:
+#             raise Exception('Unknown scale name: {}'.format(repr(scaleName)))
+#         self.markedNotes = []
+#         idx = NOTES.index(keyName)
+#         shiftedNotes = listRot(NOTES, -idx)
+#         notes = [shiftedNotes[0]]
+#         i = 0
+#         for ii in intervals[:-1]:
+#             i = i + ii
+#             notes.append(shiftedNotes[i])
+#         self.markedNotes = []
+#         for name in notes:
+#             noteName = self.checkNoteName(name)
+#             for string, stringNotes in enumerate(self.allNotes):
+#                 for fret, note in enumerate(stringNotes[1:]):
+#                     if note == noteName:
+#                         self.markedNotes.append((string, fret + 1,
+#                                                  note == keyName))
+#     def paint(self, painter, option, widget):
+#         """Draw the neck.
+
+#         This method differs from Neck.paint() in that self.markedNotes has an
+#         extra root note value in each tuple. They are drawn a different color.
+
+#         Return None.
+#         """
+#         super(Neck, self).paint(painter, option, widget)
+#         for string, fret, root in self.markedNotes:
+#             if root:
+#                 # mark root notes different color
+#                 painter.setBrush(QBrush(QColor(255, 0, 0)))
+#                 painter.setPen(QColor(255, 0, 0))
+#             else:
+#                 painter.setBrush(QBrush(QColor(0, 0, 0)))
+#                 painter.setPen(QColor(0, 0, 0))
+#             fretX1 = self.fretXs[fret-1]
+#             fretX2 = self.fretXs[fret]
+#             r = self.markerDia / 2.0
+#             painter.drawEllipse(QPointF((fretX1 + fretX2) / 2.0,
+#                                         self.stringYs[string]),
+#                                 r, r)
