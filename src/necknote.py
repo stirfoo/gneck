@@ -11,7 +11,6 @@ Saturday, August 24 2013
 
 import re
 import sys
-from random import choice
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -84,6 +83,7 @@ class AppWindow(QMainWindow):
         return w
     def _createNoteGuessWidget(self):
         w = NoteGuessWidget()
+        self.noteGuessWidget = w # for radio button checking
         for button in [x for x in w.children() if isinstance(x, QPushButton)]:
             txt = button.text()
             if txt == 'Next Note':
@@ -117,8 +117,8 @@ class AppWindow(QMainWindow):
     def onNextNote(self):
         """Display the next random note on the fretboard
         """
-        self.curNote = choice(NOTES)
-        self.view.neck.markRandomNote(self.curNote)
+        self.curNote \
+            = self.view.neck.markRandomNote(self.noteGuessWidget.noteFilter())
         self.scene.update()
     def onNoteGuessPress(self, noteName):
         """Check if the user guessed the right note.

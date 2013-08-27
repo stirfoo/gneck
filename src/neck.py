@@ -7,7 +7,7 @@ Sunday, August 25 2013
 """
 
 from math import sin, asin, degrees
-from random import randrange
+from random import randrange, choice
 from itertools import cycle
 
 from PyQt4.QtCore import QPointF, QRectF
@@ -202,17 +202,23 @@ class Neck(QGraphicsPathItem):
                 x = (self.fretXs[fret-1] + self.fretXs[fret]) / 2.0
             r = self.markerDia / 2.0
             painter.drawEllipse(QPointF(x, self.stringYs[string]), r, r)
-    def markRandomNote(self, noteName):
-        """Mark the note for display on the neck.
+    def markRandomNote(self, noteFilter='All'):
+        """Mark a random note for display on the neck.
 
-        noteName -- see: checkNoteName()
+        noteFilter -- one of:
+                      * 'All', any note is okay
+                      * 'Natural', no sharps or flats
+                      * 'Markers', only open notes or notes on neck markers
 
-        Does not call update. Return None.
+        Does not call update. Return the note selected.
         """
-        noteName = self.checkNoteName(noteName)
         while True:
+            noteName = choice(NOTES)
+            # no flats allowed
+            if noteFilter == 'Natural' and 'b' in noteName:
+                continue
             string = randrange(self.nStrings)
-            # try to get a little more even distibution of the note palcement
+            # try to get a little more even distibution of the note placement
             if randrange(10) % 2 == 0:
                 startFret = 0
             else:
@@ -222,8 +228,14 @@ class Neck(QGraphicsPathItem):
                 idx = self.allNotes[string][startFret:].index(noteName)
             except ValueError:
                 continue
-            self.markedNotes = [(string, idx + startFret, False)]
+            fret = idx + startFret
+            # only open notes or notes on markers
+            if noteFilter == 'Markers':
+                if fret not in [0, 3, 5, 7, 9, 12, 15, 17, 19, 21, 24]:
+                    continue
+            self.markedNotes = [(string, fret, False)]
             break
+        return noteName
     def markAll(self, noteName):
         """Mark every position of noteName for display.
 
