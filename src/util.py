@@ -28,11 +28,10 @@ ASC2UNI = {'A#': u'A♯', 'A': 'A', 'Ab': u'A♭',
                         'E': 'E', 'Eb': u'E♭',
            'F#': u'F♯', 'F': 'F',
            'G#': u'G♯', 'G': 'G', 'Gb': u'G♭'}
-
-# Unicode to ASCII for GUI lables -> notes.
+# Unicode to ASCII for GUI labels -> notes.
 UNI2ASC = dict([[v,k] for k,v in ASC2UNI.items()])
 # All available tunings. The first value is displayed in the tuning list
-# view. The second value is the tool tip text.
+# view. The second value is its tool tip text.
 TUNINGS = [('EADG',      'Std 4 string'),
            ('DADG',      'Drop D 4 string'),
            ('BEADG',     'Std 5 string'),
@@ -54,7 +53,7 @@ TUNINGS = [('EADG',      'Std 4 string'),
            ]
 # Major scale intervals
 MAJ_INTERVALS = [2, 2, 1, 2, 2, 2, 1]
-# Major Pentatonic intevals
+# Major Pentatonic intervals
 MAJ_PENT_INTERVALS = [2, 2, 3, 2, 3]
 # Major blues intervals
 MAJ_BLUES_INTERVALS = [2, 1, 1, 3, 2, 3]

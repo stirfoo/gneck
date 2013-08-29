@@ -123,7 +123,7 @@ class AppWindow(QMainWindow):
     def onNoteGuessPress(self, noteName):
         """Check if the user guessed the right note.
 
-        note -- string label of the button pressed (Unicode)
+        noteName -- string label of the button pressed (Unicode)
 
         If note matches the current note displayed on the neck, call
         nextNote(), else show all the positions of the current note on the
@@ -139,7 +139,7 @@ class AppWindow(QMainWindow):
     def onFretCountChanged(self, frets):
         """Update the number of frets on the neck.
 
-        value -- integer
+        frets -- integer
 
         Called when the Fret spin box is changed.
         """

@@ -19,7 +19,7 @@ from util import NOTES, SHARP2FLAT, INTERVALS, listRot
 
 
 class Neck(QGraphicsPathItem):
-    """A graphical representation of a six string guitar neck.
+    """A graphical representation of a fretted, stringed instrument neck.
 
     The neck may have 2 to 24 frets, be left or right-handed, and the tuning
     may be configured. The number of strings will be derived from the tuning.
@@ -42,6 +42,7 @@ class Neck(QGraphicsPathItem):
         super(Neck, self).__init__(parent)
         # a little thicker lines
         self.setPen(QPen(QColor(0, 0, 0), .025))
+        # list of (string, fret, bRootNote) tuples
         self.markedNotes = []
         self.setTuning(tuning)
         self.setFretCount(nFrets)
@@ -56,8 +57,10 @@ class Neck(QGraphicsPathItem):
         """
         result = []
         self.nStrings = len(tuning)
-        if self.nStrings < 2 or self.nStrings > 7:
-            raise Exception("tuning must have 4 to 7 notes")
+        # Minimum of 2 to simplify drawing the neck.
+        # Max is arbitrarily 20 to prevent drawing zillions of strings.
+        if self.nStrings < 2 or self.nStrings > 20:
+            raise Exception("tuning must have from 2 to 20 strings")
         for noteName in tuning:
             try:
                 result.append(self.checkNoteName(noteName))
@@ -174,10 +177,6 @@ class Neck(QGraphicsPathItem):
                 if f > self.nFrets:
                     break
                 self.allNotes[string].append(note)
-    # XXX: wont work, dont know if it's using shape() instead
-    def boundingRect(self):
-        r = super(Neck, self).boundingRect()
-        return r.adjusted(-.125, -.125, .25, .25)
     def paint(self, painter, option, widget):
         """Draw the neck.
 
@@ -218,7 +217,7 @@ class Neck(QGraphicsPathItem):
             if noteFilter == 'Natural' and 'b' in noteName:
                 continue
             string = randrange(self.nStrings)
-            # try to get a little more even distibution of the note placement
+            # try to get a little more even distribution of the note placement
             if randrange(10) % 2 == 0:
                 startFret = 0
             else:
@@ -252,7 +251,7 @@ class Neck(QGraphicsPathItem):
     def markScale(self, scaleName, keyName):
         """Mark the scale in the given key.
 
-        scaleName -- a key found in ScaleNeck.intervals
+        scaleName -- a key found in INTERVALS
         keyName -- see: checkNoteName()
 
         Does not call update(). Raise Exception if either scaleName or keyName
@@ -295,77 +294,3 @@ class Neck(QGraphicsPathItem):
                 raise Exception("Illegal note {}".format(repr(noteName)))
         return noteName
     
-# class ScaleNeck(Neck):
-#     # 1 is 1 fret, 2 is 2, etc.
-#     majIntervals = [2, 2, 1, 2, 2, 2, 1]
-#     majPentIntervals = [2, 2, 3, 2, 3]
-#     majBluesIntervals = [2, 1, 1, 3, 2, 3]
-#     intervals = {'Major': listRot(majIntervals, 0),
-#                  'Ionian': listRot(majIntervals, 0),
-#                  'Dorian': listRot(majIntervals, -1),
-#                  'Phrygian': listRot(majIntervals, -2),
-#                  'Lydian': listRot(majIntervals, -3),
-#                  'Mixolydian': listRot(majIntervals, -4),
-#                  'Aeolian': listRot(majIntervals, -5),
-#                  'Locrian': listRot(majIntervals, -6),
-#                  'Major Pentatonic': listRot(majPentIntervals, 0),
-#                  'Minor Pentatonic': listRot(majPentIntervals, 1),
-#                  'Harmonic Minor': [2, 1, 2, 2, 1, 3, 1],
-#                  'Major Blues': listRot(majBluesIntervals, 0),
-#                  'Minor Blues': listRot(majBluesIntervals, 1),
-#                  }
-#     def markScale(self, scaleName, keyName):
-#         """Mark the scale in the given key.
-
-#         scaleName -- a key found in ScaleNeck.intervals
-#         keyName -- see: checkNoteName()
-
-#         Does not call update(). Raise Exception if either scaleName or keyName
-#         is unknown. Return None.
-#         """
-#         try:
-#             keyName = self.checkNoteName(keyName)
-#         except:
-#             raise Exception('Unknown key name: {}'.format(repr(keyName)))
-#         intervals = self.intervals.get(scaleName, None)
-#         if intervals is None:
-#             raise Exception('Unknown scale name: {}'.format(repr(scaleName)))
-#         self.markedNotes = []
-#         idx = NOTES.index(keyName)
-#         shiftedNotes = listRot(NOTES, -idx)
-#         notes = [shiftedNotes[0]]
-#         i = 0
-#         for ii in intervals[:-1]:
-#             i = i + ii
-#             notes.append(shiftedNotes[i])
-#         self.markedNotes = []
-#         for name in notes:
-#             noteName = self.checkNoteName(name)
-#             for string, stringNotes in enumerate(self.allNotes):
-#                 for fret, note in enumerate(stringNotes[1:]):
-#                     if note == noteName:
-#                         self.markedNotes.append((string, fret + 1,
-#                                                  note == keyName))
-#     def paint(self, painter, option, widget):
-#         """Draw the neck.
-
-#         This method differs from Neck.paint() in that self.markedNotes has an
-#         extra root note value in each tuple. They are drawn a different color.
-
-#         Return None.
-#         """
-#         super(Neck, self).paint(painter, option, widget)
-#         for string, fret, root in self.markedNotes:
-#             if root:
-#                 # mark root notes different color
-#                 painter.setBrush(QBrush(QColor(255, 0, 0)))
-#                 painter.setPen(QColor(255, 0, 0))
-#             else:
-#                 painter.setBrush(QBrush(QColor(0, 0, 0)))
-#                 painter.setPen(QColor(0, 0, 0))
-#             fretX1 = self.fretXs[fret-1]
-#             fretX2 = self.fretXs[fret]
-#             r = self.markerDia / 2.0
-#             painter.drawEllipse(QPointF((fretX1 + fretX2) / 2.0,
-#                                         self.stringYs[string]),
-#                                 r, r)

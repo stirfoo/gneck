@@ -39,13 +39,10 @@ class ScaleWidget(QGroupBox):
         vLayout.addWidget(self.scaleListView)
         self.setLayout(vLayout)
     def curScale(self):
+        """Return the text of the currently selected scale.
+        """
         return str(self.scaleListView.currentItem().text())
     def curKey(self):
+        """Return the text of the currently selected key.
+        """
         return str(UNI2ASC[unicode(self.keyComboBox.currentText())])
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    w = ScaleWidget()
-    w.show()
-    app.exec_()
-    

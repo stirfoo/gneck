@@ -59,15 +59,9 @@ class NoteGuessWidget(QGroupBox):
         vLayout.addStretch(2)
         self.setLayout(vLayout)
     def noteFilter(self):
+        """Return the text of the active filter radio button.
+        """
         for widget in self.children():
             if isinstance(widget, QRadioButton) and widget.isChecked():
                 return widget.text()
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    d = DummyWidget()
-    w = NoteGuessWidget(d)
-    d.show()
-    app.exec_()
-        
-
+            
